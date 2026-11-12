@@ -1,0 +1,114 @@
+name: Sync Runtime Config & Verify Telegram
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: GitHub Environment đích (phải được tạo trong Settings → Environments)
+        required: true
+        type: environment
+      apply_changes:
+        description: Ghi GitHub Environment + cập nhật từng biến trên Render (mặc định chỉ dry-run)
+        required: true
+        type: boolean
+        default: false
+      deploy_after_sync:
+        description: Trigger Render deploy và xác minh health + Telegram webhook sau khi đồng bộ
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync-and-verify:
+    name: Audit → Sync → Deploy → Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: ${{ inputs.target_environment }}
+    env:
+      TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+      GH_TOKEN: ${{ secrets.GH_CONFIG_SYNC_TOKEN }}
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+
+      # Runtime secrets lấy từ GitHub Environment.
+      BOT1_TOKEN: ${{ secrets.BOT1_TOKEN }}
+      BOT2_TOKEN: ${{ secrets.BOT2_TOKEN }}
+      TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+      TELEGRAM_SECOND_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_SECOND_WEBHOOK_SECRET }}
+      BANK_WEBHOOK_SECRET: ${{ secrets.BANK_WEBHOOK_SECRET }}
+      VIDEO_PROCESSOR_SECRET: ${{ secrets.VIDEO_PROCESSOR_SECRET }}
+      LEGACY_SESSION_SECRET: ${{ secrets.LEGACY_SESSION_SECRET }}
+      VIETQR_ACCOUNT_NO: ${{ secrets.VIETQR_ACCOUNT_NO }}
+      VIETQR_ACCOUNT_NAME: ${{ secrets.VIETQR_ACCOUNT_NAME }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # Runtime variables.
+      APP_ENV: ${{ vars.APP_ENV || 'production' }}
+      PORT: ${{ vars.PORT || '10000' }}
+      APP_URL: https://hendy-bot-cybertech-1.onrender.com
+      WEBAPP_URL: ${{ vars.WEBAPP_URL }}
+      ALLOWED_ORIGINS: https://hendy-bot-cybertech-1.onrender.com
+      ADMIN_ID: ${{ vars.ADMIN_ID }}
+      ADMIN_IDS: ${{ vars.ADMIN_IDS }}
+      DATABASE_SSL: ${{ vars.DATABASE_SSL || 'true' }}
+      DB_STARTUP_WAIT_SECONDS: ${{ vars.DB_STARTUP_WAIT_SECONDS || '120' }}
+      RUN_MIGRATIONS_ON_START: ${{ vars.RUN_MIGRATIONS_ON_START || 'true' }}
+      WEBHOOK_AUTO_REGISTER: ${{ vars.WEBHOOK_AUTO_REGISTER || 'true' }}
+      BANK_WEBHOOK_ENABLED: ${{ vars.BANK_WEBHOOK_ENABLED || 'false' }}
+      VIETQR_BANK_ID: ${{ vars.VIETQR_BANK_ID }}
+      GROUP_URL: ${{ vars.GROUP_URL }}
+      CHANNEL_URL: ${{ vars.CHANNEL_URL }}
+      TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: ${{ vars.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS || '86400' }}
+      WEBSOCKET_URL: wss://hendy-bot-cybertech-1.onrender.com/ws
+      WEBSOCKET_ENABLED: ${{ vars.WEBSOCKET_ENABLED || 'true' }}
+      WEBSOCKET_ALLOWED_ORIGINS: https://hendy-bot-cybertech-1.onrender.com
+      WEBSOCKET_MAX_CONNECTIONS: ${{ vars.WEBSOCKET_MAX_CONNECTIONS || '250' }}
+      WEBSITE_SESSION_TTL_SECONDS: ${{ vars.WEBSITE_SESSION_TTL_SECONDS || '43200' }}
+      WEBSOCKET_BIND: ${{ vars.WEBSOCKET_BIND || '127.0.0.1' }}
+      WEBSOCKET_PORT: ${{ vars.WEBSOCKET_PORT || '10001' }}
+      MEDIA_ALLOWED_HOSTS: ${{ vars.MEDIA_ALLOWED_HOSTS || 'youtube.com,youtu.be,tiktok.com,facebook.com,fb.watch' }}
+      VIDEO_PROCESSOR_URL: ${{ vars.VIDEO_PROCESSOR_URL }}
+      VIDEO_WORKER_POLL_SECONDS: ${{ vars.VIDEO_WORKER_POLL_SECONDS || '5' }}
+      VIDEO_PROCESSING_STALE_MINUTES: ${{ vars.VIDEO_PROCESSING_STALE_MINUTES || '90' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: curl, mbstring, pdo, pdo_pgsql
+          coverage: none
+
+      - name: Install and validate source environment manifest
+        run: |
+          set -euo pipefail
+          php -l scripts/audit-env.php
+          php -l bin/validate-config.php
+          php scripts/audit-env.php --check --self-test
+          bash -n scripts/sync-render-env.sh scripts/deploy-verify-render.sh
+
+      - name: Validate supplied runtime configuration and dry-run/apply
+        env:
+          APPLY_CHANGES: ${{ inputs.apply_changes }}
+          DEPLOY_AFTER_SYNC: ${{ inputs.deploy_after_sync }}
+        run: |
+          set -euo pipefail
+          if [[ "$DEPLOY_AFTER_SYNC" == "true" && "$APPLY_CHANGES" != "true" ]]; then
+            echo "Không thể deploy khi apply_changes=false." >&2
+            exit 1
+          fi
+          if [[ "$APPLY_CHANGES" == "true" ]]; then
+            bash scripts/sync-render-env.sh --apply
+          else
+            bash scripts/sync-render-env.sh --dry-run
+          fi
+
+      - name: Deploy Render and verify database + Telegram webhooks
+        if: ${{ inputs.deploy_after_sync }}
+        run: bash scripts/deploy-verify-render.sh

@@ -1,0 +1,239 @@
+name: PHP CI
+
+on:
+  push:
+    branches:
+      - main
+      - php-backend-migration
+      - feature/realtime-modular-platform-review
+      - feature/button-theme-animated-icons
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hendy
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: hendy_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hendy -d hendy_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://hendy:ci-only-password@127.0.0.1:5432/hendy_test
+      DATABASE_SSL: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: curl, mbstring, pdo, pdo_pgsql
+          coverage: none
+
+      - name: Validate PHP syntax
+        run: |
+          set -euo pipefail
+          find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Smoke test public HTTP entrypoint wiring
+        run: |
+          set -euo pipefail
+          php -r '$_SERVER["REQUEST_METHOD"]="GET"; $_SERVER["REQUEST_URI"]="/"; require "public/index.php";' >/dev/null
+
+      - name: Audit environment manifest and regex patterns
+        run: |
+          set -euo pipefail
+          php -l scripts/audit-env.php
+          php scripts/audit-env.php --check --self-test
+          php -l bin/validate-config.php
+          bash -n docker/start.sh scripts/sync-render-env.sh scripts/deploy-verify-render.sh
+
+      - name: Run PHP tests
+        run: php tests/run.php
+
+      - name: Validate runtime config and safe sync dry-run
+        env:
+          BOT1_TOKEN: ${{ format('123456789:{0}', 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef') }}
+          BOT2_TOKEN: ${{ format('987654321:{0}', 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef') }}
+          ADMIN_ID: "12345678"
+          APP_URL: "https://example.invalid"
+          DATABASE_URL: "postgresql://ci:ci@127.0.0.1:5432/ci"
+          DATABASE_SSL: "false"
+          TELEGRAM_WEBHOOK_SECRET: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          TELEGRAM_SECOND_WEBHOOK_SECRET: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+          WEBHOOK_AUTO_REGISTER: "true"
+          BANK_WEBHOOK_ENABLED: "false"
+        run: |
+          set -euo pipefail
+          php bin/validate-config.php
+          if env ADMIN_ID="12x" php bin/validate-config.php >/dev/null 2>&1; then
+            echo "Validator đã chấp nhận ADMIN_ID sai định dạng." >&2
+            exit 1
+          fi
+          if env BANK_WEBHOOK_ENABLED="true" php bin/validate-config.php >/dev/null 2>&1; then
+            echo "Validator đã cho phép bank webhook chưa có adapter chữ ký." >&2
+            exit 1
+          fi
+          generated_env_file="$(mktemp)"
+          env -u TELEGRAM_WEBHOOK_SECRET -u TELEGRAM_SECOND_WEBHOOK_SECRET -u LEGACY_SESSION_SECRET GITHUB_ENV="$generated_env_file" bash scripts/sync-render-env.sh --dry-run
+          grep -q '^TELEGRAM_WEBHOOK_SECRET=' "$generated_env_file"
+          grep -q '^TELEGRAM_SECOND_WEBHOOK_SECRET=' "$generated_env_file"
+          grep -q '^LEGACY_SESSION_SECRET=' "$generated_env_file"
+          if grep -q '^BANK_WEBHOOK_SECRET=' "$generated_env_file"; then
+            echo "Workflow không được tự sinh BANK_WEBHOOK_SECRET khi chưa có provider adapter." >&2
+            exit 1
+          fi
+          rm -f "$generated_env_file"
+
+      - name: Validate commercial homepage, self-hosted assets and public routes
+        run: |
+          set -euo pipefail
+          test -s apps/website/landing.html
+          test -s public/assets/hendy-landing.css
+          test -s public/assets/hendy-landing.js
+          node --check public/assets/hendy-landing.js
+          php -r '$html=file_get_contents("apps/website/landing.html"); if (preg_match("#<script(?![^>]*\\bsrc=)[^>]*>.*?</script>#si", $html)) { fwrite(STDERR, "Landing page must not contain inline JavaScript\\n"); exit(1); }'
+          grep -q '/assets/hendy-landing.css' apps/website/landing.html
+          grep -q '/assets/hendy-landing.js' apps/website/landing.html
+          grep -q "apps/website/landing.html" public/index.php
+          grep -q "'/admin'" public/index.php
+          grep -q "'/customer'" public/index.php
+          grep -q "'/privacy'" public/index.php
+          grep -q "'/terms'" public/index.php
+          grep -q "'/health'" public/index.php
+          grep -q "'/miniapp'" public/index.php
+          grep -q "'/api/v1/public/config'" public/index.php
+          grep -q "BOT1_PUBLIC_URL" public/index.php
+          grep -q "BOT1_PUBLIC_URL=" .env.example
+          grep -q "BOT2_PUBLIC_URL=" .env.example
+          grep -q '"BOT1_PUBLIC_URL"' config/env.schema.json
+          ! grep -Eq 'BotIdentity|->getMe|function getMe' public/index.php app/BotService.php app/ApiController.php app/TelegramApi.php bin/register-webhooks.php
+          ! grep -q 'getMe()' apps/website/landing.html apps/website/index.html
+          grep -q "TelegramLink::normalize" public/index.php
+          test -s app/TelegramAuth.php
+          grep -q 'telegram_webhook_secrets' database/schema.sql
+          grep -q 'pg_advisory_xact_lock' app/TelegramAuth.php
+          grep -q 'random_bytes(32)' app/TelegramAuth.php
+          grep -q "TelegramAuth::webhookSecret" public/index.php
+          grep -q "TelegramAuth::webhookSecret" bin/register-webhooks.php
+          ! grep -Eq 'secret_value|telegram_webhook_secrets|override_fingerprint' public/index.php apps/website/index.html apps/admin-dashboard/index.html app/ApiController.php
+
+          grep -q "'/privacy'" public/index.php
+          grep -q "'/terms'" public/index.php
+          test -s apps/website/privacy.html
+          test -s apps/website/terms.html
+          test -s public/robots.txt
+          test -s public/sitemap.xml
+          ! grep -Eq 'cdn\\.tailwindcss\\.com|cdnjs\\.cloudflare\\.com|fonts\\.googleapis\\.com|YOUR_BOT_USERNAME' apps/website/landing.html
+          ! grep -Eq "HendyBot_Bot|hendymono_bot" apps/website/index.html
+
+      - name: Validate inline dashboard JavaScript
+        run: |
+          php -r '$html=file_get_contents("apps/admin-dashboard/index.html"); preg_match_all("#<script(?![^>]*src=)[^>]*>(.*?)</script>#si", $html, $matches); if (!$matches[1]) { fwrite(STDERR, "No inline dashboard script found\\n"); exit(1); } file_put_contents(sys_get_temp_dir()."/hendy-dashboard.js", implode("\\n;\\n", $matches[1]));'
+          node --check "$(php -r 'echo sys_get_temp_dir()."/hendy-dashboard.js";')"
+
+      - name: Validate unified HENDY website JavaScript and customer-center route
+        run: |
+          set -euo pipefail
+          test -s apps/website/index.html
+          php -r '$html=file_get_contents("apps/website/index.html"); preg_match_all("#<script(?![^>]*src=)[^>]*>(.*?)</script>#si", $html, $matches); if (count($matches[1]) !== 1) { fwrite(STDERR, "Website must contain exactly one inline application script\\n"); exit(1); } file_put_contents(sys_get_temp_dir()."/hendy-website.js", $matches[1][0]);'
+          node --check "$(php -r 'echo sys_get_temp_dir()."/hendy-website.js";')"
+          php -r '$paths=["/KHACH-HANG/TRUNG-TAM-KHACH-HANG/index.php","//KHACH-HANG/TRUNG-TAM-KHACH-HANG/index.php"]; foreach($paths as $path){if(!preg_match("#^/+KHACH-HANG/TRUNG-TAM-KHACH-HANG/index\\.php/?$#i",$path)){fwrite(STDERR,"Customer center route not matched: ".$path."\\n");exit(1);}}'
+          grep -q '/api/customer-center' apps/website/index.html
+          grep -q 'data-customer-tab' apps/website/index.html
+          grep -q 'support-abuse' apps/website/index.html
+          grep -q 'submit-voucher' apps/website/index.html
+          grep -q 'telegram-web-app.js?64' apps/website/index.html
+          grep -q 'initTelegramMiniApp' apps/website/index.html
+          grep -q 'tg.ready()' apps/website/index.html
+          grep -q 'tg.expand()' apps/website/index.html
+          grep -q 'tg.MainButton.onClick' apps/website/index.html
+          grep -q 'tg.BackButton.onClick' apps/website/index.html
+          grep -q 'HapticFeedback' apps/website/index.html
+          grep -q 'safeAreaChanged' apps/website/index.html
+          grep -q 'contentSafeAreaChanged' apps/website/index.html
+
+      - name: Verify dashboard buttons and Docker tools
+        run: |
+          grep -q -- '--btn-primary-start' apps/admin-dashboard/styles/buttons.css
+          grep -q -- '.ripple' apps/admin-dashboard/styles/buttons.css
+          grep -q -- '@keyframes icon-spin' apps/admin-dashboard/styles/buttons.css
+          grep -q -- 'button.is-loading' apps/admin-dashboard/styles/buttons.css
+          grep -q -- 'button.is-success' apps/admin-dashboard/styles/buttons.css
+          grep -q -- 'installVisualEffects();' apps/admin-dashboard/index.html
+          ! grep -q 'telegram-web-app.js' apps/admin-dashboard/index.html
+          ! grep -q 'initAdminMiniApp();' apps/admin-dashboard/index.html
+          grep -q "credentials:'same-origin'" apps/admin-dashboard/index.html
+          grep -q 'MỞ BẢNG ĐIỀU KHIỂN ADMIN' apps/admin-dashboard/index.html
+          for tab in overview users orders payments products tickets vouchers giftcodes bot-menus runtime modules video-jobs settings audit; do
+            grep -q "state.adminTab === '$tab'" apps/admin-dashboard/index.html
+          done
+          for handler in adminOverview adminUsers adminOrders adminPayments adminProducts adminTickets adminVouchers adminGiftcodes adminBotMenus adminRuntime adminModules adminVideoJobs adminSettings adminAudit; do
+            grep -q "function $handler" apps/admin-dashboard/index.html
+          done
+          grep -q 'class="sidebar"' apps/admin-dashboard/index.html
+          grep -q 'data-admin-tab="bot-menus"' apps/admin-dashboard/index.html
+          grep -q "document.body.classList.toggle('sidebar-open')" apps/admin-dashboard/index.html
+          grep -q -- 'unzip' Dockerfile
+
+      - name: Run PostgreSQL migration and smoke tests
+        run: |
+          php bin/migrate.php
+          php tests/database-smoke.php
+
+      - name: Smoke test feature scaffold
+        run: |
+          php scripts/scaffold-feature.php --name ci-smoke-check --category api --description "CI scaffold test"
+          php -l app/features/ci-smoke-check/CiSmokeCheckFeature.php
+
+      - name: Build Docker image
+        run: docker build --pull -t hendy-bot-tele:ci .
+
+      - name: Verify bot token configuration and deployment commands
+        run: |
+          set -euo pipefail
+          grep -q '^BOT1_TOKEN=' .env.example
+          grep -q '^BOT2_TOKEN=' .env.example
+          ! grep -Eq '^(BOTCHINH_TOKEN|BOTPHU_TOKEN|BOT_TOKEN|BOT_SECOND_TOKEN)=' .env.example
+          ! grep -Eq '^BOT[12]_TOKEN=[0-9]+:' .env.example
+          ! grep -Eq '^DATABASE_URL=.*(PGPASSWORD=|[[:space:]]psql[[:space:]])' .env.example
+          grep -q 'dockerCommand: /var/www/app/docker/start.sh' render.yaml
+          ! grep -q 'preDeployCommand:' render.yaml
+          grep -q 'RUN_MIGRATIONS_ON_START' render.yaml
+          grep -q 'bin/wait-for-database.php' docker/start.sh
+          grep -q 'php bin/migrate.php' docker/start.sh
+          grep -q '^EXPOSE 10000$' Dockerfile
+          grep -q 'WEBHOOK_AUTO_REGISTER' .env.example
+          test -s config/env.schema.json
+          test -s scripts/audit-env.php
+          test -s scripts/sync-render-env.sh
+          test -s scripts/deploy-verify-render.sh
+          test -s .github/workflows/sync-runtime-config.yml
+          grep -q 'deploy-verify-render.sh' .github/workflows/sync-runtime-config.yml
+          ! grep -Eq 'getMe|BotIdentity' bin/register-webhooks.php scripts/deploy-verify-render.sh
+          grep -q '401 Unauthorized' bin/register-webhooks.php
+          grep -q 'apache2-foreground' docker/start.sh
+          grep -q 'php bin/websocket.php' docker/start.sh
+          grep -q 'WEBSOCKET_ENABLED' render.yaml
+          bash -n docker/start.sh
+
+      - name: Verify deployment files
+        run: |
+          test -s Dockerfile
+          test -s render.yaml
+          test -s database/schema.sql
+          test -s bin/wait-for-database.php

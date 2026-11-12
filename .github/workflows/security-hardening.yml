@@ -1,0 +1,38 @@
+name: Security hardening
+
+on:
+  push:
+    branches: [main, security/token-hardening]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: curl, mbstring, pdo, pdo_pgsql
+          coverage: none
+
+      - name: PHP syntax
+        run: |
+          set -euo pipefail
+          find app public bin tests scripts -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Secret scan
+        run: php scripts/secret-scan.php
+
+      - name: Unit tests
+        run: php tests/run.php

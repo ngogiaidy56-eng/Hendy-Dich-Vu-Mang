@@ -1,0 +1,66 @@
+name: Scaffold PHP feature
+
+on:
+  workflow_dispatch:
+    inputs:
+      feature_name:
+        description: "Tên feature dạng kebab-case (ví dụ order-history)"
+        required: true
+        type: string
+      category:
+        description: "Nơi tạo scaffold"
+        required: true
+        type: choice
+        options:
+          - api
+          - bot
+          - dashboard
+      description:
+        description: "Mô tả mục tiêu feature"
+        required: false
+        type: string
+        default: "Tính năng mới của Hendy Bot"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+
+      - name: Create feature files
+        env:
+          FEATURE_NAME: ${{ inputs.feature_name }}
+          FEATURE_CATEGORY: ${{ inputs.category }}
+          FEATURE_DESCRIPTION: ${{ inputs.description }}
+        run: |
+          php scripts/scaffold-feature.php \
+            --name "$FEATURE_NAME" \
+            --category "$FEATURE_CATEGORY" \
+            --description "$FEATURE_DESCRIPTION"
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: scaffold/${{ inputs.feature_name }}
+          delete-branch: true
+          commit-message: "chore(scaffold): add ${{ inputs.feature_name }} feature"
+          title: "Scaffold feature: ${{ inputs.feature_name }}"
+          body: |
+            Tạo scaffold PHP cho feature ${{ inputs.feature_name }}.
+            Loại: ${{ inputs.category }}
+            Mô tả: ${{ inputs.description }}
+
+            Feature mặc định disabled. Cần review quyền, dữ liệu, migration và test trước khi bật.
