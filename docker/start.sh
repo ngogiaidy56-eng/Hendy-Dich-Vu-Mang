@@ -9,7 +9,7 @@ if ! [[ "$port" =~ ^[0-9]{1,5}$ ]] || (( port < 1 || port > 65535 )); then
 fi
 
 sed -i -E "s/^Listen [0-9]+$/Listen ${port}/" /etc/apache2/ports.conf
-sed -i "s/:10000>/: ${port}>/" /etc/apache2/sites-available/000-default.conf
+sed -i "s/:10000>/:\${port}>/" /etc/apache2/sites-available/000-default.conf
 
 mkdir -p storage/modules app_store/uploads/screenshots
 chown -R www-data:www-data storage app_store/uploads

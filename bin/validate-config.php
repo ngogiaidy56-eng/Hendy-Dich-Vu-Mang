@@ -12,6 +12,7 @@ $bot1 = Hendy\TelegramAuth::token('primary');
 $bot2 = Hendy\TelegramAuth::token('secondary');
 $admin = trim((string) Hendy\Env::get('ADMIN_ID', ''));
 $adminList = trim((string) Hendy\Env::get('ADMIN_IDS', ''));
+$runtimeEnabled = Hendy\Env::bool('TELEGRAM_RUNTIME_ENABLED', $bot1 !== '');
 
 foreach (['BOT1_PUBLIC_URL', 'BOT2_PUBLIC_URL'] as $publicUrlName) {
     $publicUrl = trim((string) Hendy\Env::get($publicUrlName, ''));
@@ -26,8 +27,11 @@ $secretPattern = '~\A[A-Za-z0-9_-]{32,256}\z~D';
 
 // Use explicit ASCII ranges and ~ delimiters. This avoids shell/YAML escaping
 // ambiguities and the PCRE shorthand escape differences users encountered.
-if (preg_match($botTokenPattern, $bot1) !== 1) {
-    $errors[] = 'BOT1_TOKEN chưa có hoặc không đúng định dạng.';
+if ($runtimeEnabled && $bot1 === '') {
+    $errors[] = 'TELEGRAM_RUNTIME_ENABLED=true nhưng BOT1_TOKEN chưa được cấu hình.';
+}
+if ($bot1 !== '' && preg_match($botTokenPattern, $bot1) !== 1) {
+    $errors[] = 'BOT1_TOKEN không đúng định dạng.';
 }
 if ($bot2 !== '' && preg_match($botTokenPattern, $bot2) !== 1) {
     $errors[] = 'BOT2_TOKEN không đúng định dạng.';
@@ -45,8 +49,8 @@ foreach ($extraAdmins as $extraAdmin) {
         break;
     }
 }
-if (Hendy\TelegramAuth::adminIds() === []) {
-    $errors[] = 'Cần cấu hình ít nhất một Telegram admin trong ADMIN_ID hoặc ADMIN_IDS.';
+if ($runtimeEnabled && Hendy\TelegramAuth::adminIds() === []) {
+    $errors[] = 'Cần cấu hình ít nhất một Telegram admin trong ADMIN_ID hoặc ADMIN_IDS khi bật Telegram runtime.';
 }
 
 $dbUrl = Hendy\Env::get('DATABASE_URL');
@@ -60,13 +64,13 @@ if ($dbUrl !== null) {
 }
 $dbScheme = is_array($dbParts) ? strtolower((string) ($dbParts['scheme'] ?? '')) : '';
 $dbPath = is_array($dbParts) ? (string) ($dbParts['path'] ?? '') : '';
-if (
-    !is_array($dbParts) ||
-    !in_array($dbScheme, ['postgres', 'postgresql'], true) ||
-    empty($dbParts['host']) ||
-    trim($dbPath, '/') === ''
-) {
-    $errors[] = 'DATABASE_URL phải là URI PostgreSQL dạng postgresql://USER:PASSWORD@HOST:5432/DB. Không dán câu lệnh PGPASSWORD=... psql -h ... vào biến này.';
+$databaseConfigured = $dbUrl !== null;
+$databaseValid = is_array($dbParts)
+    && in_array($dbScheme, ['postgres', 'postgresql'], true)
+    && !empty($dbParts['host'])
+    && trim($dbPath, '/') !== '';
+if (($runtimeEnabled && !$databaseConfigured) || ($databaseConfigured && !$databaseValid)) {
+    $errors[] = 'Telegram runtime yêu cầu DATABASE_URL PostgreSQL hợp lệ dạng postgresql://USER:PASSWORD@HOST:5432/DB.';
 }
 
 $sslValue = (string) Hendy\Env::get('DATABASE_SSL', 'true');
@@ -74,8 +78,11 @@ if (!in_array(strtolower($sslValue), ['true', 'false', '1', '0', 'yes', 'no', 'o
     $errors[] = 'DATABASE_SSL chỉ nhận true hoặc false.';
 }
 
-$autoWebhook = Hendy\Env::bool('WEBHOOK_AUTO_REGISTER', true);
+$autoWebhook = Hendy\Env::bool('WEBHOOK_AUTO_REGISTER', $runtimeEnabled);
 $warnings = [];
+if ($autoWebhook && !$runtimeEnabled) {
+    $errors[] = 'WEBHOOK_AUTO_REGISTER=true yêu cầu TELEGRAM_RUNTIME_ENABLED=true.';
+}
 if ($autoWebhook) {
     $appUrl = trim((string) (Hendy\Env::get('APP_URL') ?: Hendy\Env::get('RENDER_EXTERNAL_URL', '')));
     $appParts = $appUrl !== '' ? parse_url($appUrl) : false;
@@ -127,6 +134,9 @@ if ($websiteSessionTtl < 900 || $websiteSessionTtl > 43200) {
 }
 
 if (Hendy\Env::bool('WEBSOCKET_ENABLED', false)) {
+    if (!$databaseConfigured) {
+        $errors[] = 'WEBSOCKET_ENABLED=true yêu cầu DATABASE_URL PostgreSQL.';
+    }
     $socketUrl = trim((string) Hendy\Env::get('WEBSOCKET_URL', ''));
     $socketParts = $socketUrl !== '' ? parse_url($socketUrl) : false;
     if (!is_array($socketParts) || strtolower((string) ($socketParts['scheme'] ?? '')) !== 'wss' || empty($socketParts['host'])) {
@@ -173,6 +183,7 @@ foreach ($warnings as $warning) {
     fwrite(STDERR, "CẢNH BÁO: " . $warning . "\n");
 }
 
-echo "Cấu hình hợp lệ. BOT2_TOKEN: " . ($bot2 !== '' ? 'đã bật' : 'đang tắt') .
+echo "Cấu hình hợp lệ. Telegram runtime: " . ($runtimeEnabled ? 'đã bật' : 'đang tắt') .
+    "; BOT2_TOKEN: " . ($bot2 !== '' ? 'đã bật' : 'đang tắt') .
     "; Telegram webhook: " . ($autoWebhook ? 'đã bật kiểm tra' : 'đang tắt') .
     "; bank webhook: " . ($bankEnabled ? 'đã bật' : 'đã khóa an toàn') . ".\n";

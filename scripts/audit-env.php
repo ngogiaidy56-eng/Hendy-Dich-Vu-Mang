@@ -65,7 +65,7 @@ if (in_array('--self-test', $argv, true)) {
     }
 }
 
-$roots = ['app', 'bin', 'public', 'apps/admin-dashboard', 'docker', 'scripts'];
+$roots = ['app', 'bin', 'public', 'apps/admin-dashboard', 'docker', 'scripts', 'app_store'];
 $files = [];
 $allowed = ['php', 'js', 'mjs', 'cjs', 'html', 'sh'];
 foreach ($roots as $relative) {

@@ -295,8 +295,63 @@ try {
         exit;
     }
     if ($method === 'GET' && in_array($path, ['/health', '/healthz', '/api/health'], true)) {
-        Database::check();
-        respond(['status' => 'ok', 'service' => 'hendy-bot-cybertech']);
+        $checks = ['app_store_mysql' => 'not_configured', 'telegram_postgresql' => 'not_configured'];
+        $configured = 0;
+        $failed = false;
+
+        $mysqlConfigured = Env::get('DB_HOST') !== null || Env::get('DB_NAME') !== null || Env::get('DB_USER') !== null;
+        if ($mysqlConfigured) {
+            $configured++;
+            try {
+                $mysqlHost = (string) Env::get('DB_HOST', '127.0.0.1');
+                $mysqlPort = Env::int('DB_PORT', 3306);
+                $mysqlName = (string) Env::get('DB_NAME', 'app_store');
+                $mysqlUser = (string) Env::get('DB_USER', 'root');
+                $mysqlPass = (string) Env::get('DB_PASS', '');
+                $mysqlCharset = (string) Env::get('DB_CHARSET', 'utf8mb4');
+                if ($mysqlPort < 1 || $mysqlPort > 65535
+                    || !preg_match('/\\A[A-Za-z0-9_-]+\\z/D', $mysqlName)
+                    || !preg_match('/\\A[A-Za-z0-9_]+\\z/D', $mysqlCharset)) {
+                    throw new RuntimeException('Cấu hình MySQL không hợp lệ.');
+                }
+                $mysql = new \\PDO(
+                    "mysql:host={$mysqlHost};port={$mysqlPort};dbname={$mysqlName};charset={$mysqlCharset}",
+                    $mysqlUser,
+                    $mysqlPass,
+                    [\\PDO::ATTR_ERRMODE => \\PDO::ERRMODE_EXCEPTION, \\PDO::ATTR_TIMEOUT => 5]
+                );
+                $mysql->query('SELECT 1');
+                $checks['app_store_mysql'] = 'ok';
+            } catch (Throwable $error) {
+                $checks['app_store_mysql'] = 'error';
+                $failed = true;
+                error_log('Health check MySQL thất bại: ' . $error::class);
+            }
+        }
+
+        if (Env::get('DATABASE_URL') !== null) {
+            $configured++;
+            try {
+                Database::check();
+                $checks['telegram_postgresql'] = 'ok';
+            } catch (Throwable $error) {
+                $checks['telegram_postgresql'] = 'error';
+                $failed = true;
+                error_log('Health check PostgreSQL thất bại: ' . $error::class);
+            }
+        }
+
+        $status = $configured > 0 && !$failed ? 'ok' : 'degraded';
+        respond([
+            'status' => $status,
+            'service' => 'hendy-dich-vu-mang',
+            'checks' => $checks,
+            'telegram' => [
+                'primaryConfigured' => TelegramAuth::token('primary') !== '',
+                'secondaryConfigured' => TelegramAuth::token('secondary') !== '',
+            ],
+            'timestamp' => gmdate(DATE_ATOM),
+        ], $failed ? 503 : 200);
     }
 
     // --- ROUTE TÙY CHỈNH MỞ RỘNG ---

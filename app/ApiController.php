@@ -59,10 +59,12 @@ final class ApiController
     public function handle(string $method, string $path): array
     {
         if ($method === 'GET' && $path === '/api/health') {
+            $databaseConfigured = Env::get('DATABASE_URL') !== null;
+            $databaseOkay = $databaseConfigured && Database::check();
             return self::response([
-                'service' => 'hendy-bot-tele-php',
-                'status' => Database::check() ? 'ok' : 'degraded',
-                'database' => 'ok',
+                'service' => 'hendy-dich-vu-mang',
+                'status' => $databaseOkay ? 'ok' : 'degraded',
+                'database' => $databaseConfigured ? ($databaseOkay ? 'ok' : 'error') : 'not_configured',
                 'telegram' => [
                     'primaryConfigured' => TelegramAuth::token('primary') !== '',
                     'secondaryConfigured' => TelegramAuth::token('secondary') !== '',
