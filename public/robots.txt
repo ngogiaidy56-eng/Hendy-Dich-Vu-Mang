@@ -8,4 +8,4 @@ Disallow: /mini-app
 Disallow: /api/
 Disallow: /webhook/
 
-Sitemap: https://hendy-bot-cybertech-1.onrender.com/sitemap.xml
+Sitemap: https://hendy-dich-vu-mang.onrender.com/sitemap.xml

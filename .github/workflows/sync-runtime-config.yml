@@ -48,9 +48,9 @@ jobs:
       # Runtime variables.
       APP_ENV: ${{ vars.APP_ENV || 'production' }}
       PORT: ${{ vars.PORT || '10000' }}
-      APP_URL: https://hendy-bot-cybertech-1.onrender.com
+      APP_URL: https://hendy-dich-vu-mang.onrender.com
       WEBAPP_URL: ${{ vars.WEBAPP_URL }}
-      ALLOWED_ORIGINS: https://hendy-bot-cybertech-1.onrender.com
+      ALLOWED_ORIGINS: https://hendy-dich-vu-mang.onrender.com
       ADMIN_ID: ${{ vars.ADMIN_ID }}
       ADMIN_IDS: ${{ vars.ADMIN_IDS }}
       DATABASE_SSL: ${{ vars.DATABASE_SSL || 'true' }}
@@ -64,7 +64,7 @@ jobs:
       TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: ${{ vars.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS || '86400' }}
       WEBSOCKET_URL: wss://hendy-bot-cybertech-1.onrender.com/ws
       WEBSOCKET_ENABLED: ${{ vars.WEBSOCKET_ENABLED || 'true' }}
-      WEBSOCKET_ALLOWED_ORIGINS: https://hendy-bot-cybertech-1.onrender.com
+      WEBSOCKET_ALLOWED_ORIGINS: https://hendy-dich-vu-mang.onrender.com
       WEBSOCKET_MAX_CONNECTIONS: ${{ vars.WEBSOCKET_MAX_CONNECTIONS || '250' }}
       WEBSITE_SESSION_TTL_SECONDS: ${{ vars.WEBSITE_SESSION_TTL_SECONDS || '43200' }}
       WEBSOCKET_BIND: ${{ vars.WEBSOCKET_BIND || '127.0.0.1' }}
