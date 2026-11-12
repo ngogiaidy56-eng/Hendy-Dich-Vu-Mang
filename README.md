@@ -1,30 +1,18 @@
-# Hendy Dịch Vụ Mạng — Neon Edition
+# Hendy App Store & Dịch vụ mạng
 
-This repository is initialized for the Hendy Dịch Vụ Mạng PHP application.
+PHP 8.3 + Apache + MySQL 8 (PDO). Bao gồm kho ứng dụng/trò chơi, tìm kiếm/lọc, trang chi tiết và ảnh chụp màn hình, đăng ký/đăng nhập, dịch vụ mạng và admin panel.
 
-> **Source import status:** The full application source has not yet been pushed to this repository. The current commit contains the project bootstrap README, secret-safe .gitignore, and a Windows helper script. Do not deploy this repository until the application files (for example index.php, includes/, database.sql, and Dockerfile) are present.
+## Cấu trúc
+Mã nguồn web nằm trong `app_store/`; Dockerfile ở root cấu hình Apache DocumentRoot tới thư mục này.
 
-## Publish the source ZIP from Windows
+## Chạy local
+1. Tạo MySQL database và import `app_store/database.sql`.
+2. Thiết lập biến môi trường theo `.env.example`.
+3. Build và chạy: `docker build -t hendy-app-store .` rồi `docker run --env-file .env -p 8080:80 hendy-app-store`.
+4. Đăng ký tài khoản, sau đó cấp quyền admin bằng SQL: `UPDATE users SET role='admin' WHERE email='you@example.com';`.
 
-1. Download the sanitized source archive Hendy-Dich-Vu-Mang-Source.zip from the ChatGPT conversation.
-2. Clone this repository:
-   ```powershell
-   git clone https://github.com/ngogiaidy56-eng/Hendy-Dich-Vu-Mang.git
-   ```
-3. Run the included helper, passing the path to the downloaded ZIP:
-   ```powershell
-   .\Hendy-Dich-Vu-Mang\push-source.ps1 -ZipPath "$env:USERPROFILE\Downloads\Hendy-Dich-Vu-Mang-Source.zip"
-   ```
-   Run it from a PowerShell session where Git is installed and authenticated with GitHub.
+## Render
+Web Service: Runtime Docker, Dockerfile Path `./Dockerfile`, Docker Context `.`, branch `main`. Thêm DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS, APP_URL trong Environment. Dùng MySQL 8 tương thích và import schema trước khi truy cập ứng dụng.
 
-The helper extracts the ZIP, copies the complete project files into the repository checkout, creates a commit, and pushes to main.
-
-## Neon configuration notes
-
-The source package targets PHP 8.3 + PDO PostgreSQL and has configuration for Neon PostgreSQL, Neon Object Storage, Neon Functions, and Neon Realtime. The sanitized archive excludes the local .neon file and does not include runtime .env secrets.
-
-After the source files are pushed, review the source package README for Neon provisioning, schema import, deployment and end-to-end test instructions.
-
-## Repository security
-
-The committed .gitignore excludes .env, .env.local, .neon, dependency directories, and uploaded screenshots. Never commit production connection strings, API keys, or other credentials.
+## Lưu ý production
+Không commit file .env hoặc mật khẩu thật. Upload screenshot hiện lưu trong filesystem container; filesystem Render Free không bền qua deploy/restart. Dùng object storage cho ảnh nếu cần lưu bền vững. Đăng ký tài khoản đầu tiên không tự cấp admin; hãy nâng quyền bằng SQL sau khi đăng ký.
