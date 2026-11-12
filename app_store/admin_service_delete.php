@@ -1,0 +1,2 @@
+<?php
+require_once __DIR__.'/includes/admin_check.php';require_admin();if($_SERVER['REQUEST_METHOD']!=='POST')exit;csrf_check();db()->prepare("DELETE FROM services WHERE id=?")->execute([(int)($_POST['id']??0)]);flash('Đã xóa gói dịch vụ.');header('Location: admin_services.php');exit;
