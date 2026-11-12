@@ -83,7 +83,7 @@ $assert(str_contains($landingUiSource, 'orbit-wrapper') && str_contains($landing
 $assert(!str_contains($landingUiSource, 'Features Tags Grid') && !str_contains($landingUiSource, 'feature-tag'), 'trang chủ đã bỏ hoàn toàn khối Features Tags Grid');
 $publicRouterSource = file_get_contents(dirname(__DIR__) . '/public/index.php');
 $assert(str_contains($publicRouterSource, "header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');"), 'trang chủ không giữ HTML cũ trong cache');
-$productionHost = 'https://hendy-bot-cybertech-1.onrender.com';
+$productionHost = 'https://hendy-dich-vu-mang.onrender.com';
 $landingSource = file_get_contents(dirname(__DIR__) . '/apps/website/landing.html');
 $privacySource = file_get_contents(dirname(__DIR__) . '/apps/website/privacy.html');
 $termsSource = file_get_contents(dirname(__DIR__) . '/apps/website/terms.html');
