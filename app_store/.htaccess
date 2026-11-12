@@ -1,4 +1,39 @@
 Options -Indexes
-<FilesMatch "^(database\.sql)$">
-Require all denied
+DirectoryIndex index.php
+
+# 1. Bảo vệ các file nhạy cảm (.sql, .log, .ini, .yml, file ẩn bắt đầu bằng dấu chấm)
+<FilesMatch "(^\.|\.sql$|\.log$|\.ini$|\.ya?ml$)">
+    Require all denied
 </FilesMatch>
+
+# 2. Cấu hình các tiêu đề bảo mật (Security Headers)
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set X-Frame-Options "SAMEORIGIN"
+</IfModule>
+
+# 3. Định tuyến URL thân thiện (Clean URLs)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /app_store/
+
+    # Bỏ qua nếu là file hoặc thư mục thực tế tồn tại trên server
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Định tuyến danh mục (Trang chủ)
+    RewriteRule ^category/([a-zA-Z0-9_-]+)$ index.php?cat=$1 [L,QSA]
+
+    # Định tuyến trang chi tiết ứng dụng
+    RewriteRule ^app/([0-9]+)$ detail.php?id=$1 [L,QSA]
+
+    # Định tuyến trang Dịch vụ mạng
+    RewriteRule ^dich-vu-mang$ dichvumang.php [L,QSA]
+
+    # Định tuyến các trang xác thực
+    RewriteRule ^dang-nhap$ login.php [L,QSA]
+    RewriteRule ^dang-ky$ register.php [L,QSA]
+    RewriteRule ^dang-xuat$ logout.php [L,QSA]
+</IfModule>
