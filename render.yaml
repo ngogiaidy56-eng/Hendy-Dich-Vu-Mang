@@ -1,0 +1,97 @@
+# Blueprint for the combined HENDY Web Service.
+# It does not create, migrate or replace either external database.
+services:
+  - type: web
+    name: hendy-dich-vu-mang
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: /var/www/app/docker/start.sh
+    healthCheckPath: /healthz
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: APP_URL
+        value: https://hendy-dich-vu-mang.onrender.com
+      - key: ALLOWED_ORIGINS
+        value: https://hendy-dich-vu-mang.onrender.com
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_NAME
+        value: app_store
+      - key: DB_USER
+        sync: false
+      - key: DB_PASS
+        sync: false
+      - key: DB_CHARSET
+        value: utf8mb4
+      - key: TELEGRAM_RUNTIME_ENABLED
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DB_STARTUP_WAIT_SECONDS
+        value: "120"
+      - key: RUN_MIGRATIONS_ON_START
+        value: "true"
+      - key: BOT1_TOKEN
+        sync: false
+      - key: BOT2_TOKEN
+        sync: false
+      - key: BOT_HOME_PHOTO
+        value: https://i.postimg.cc/rcD583NW/anh-quan-cao.png?dl=1
+      - key: HOMEPROXY_ENCRYPTION_KEY
+        sync: false
+      - key: BOT1_PUBLIC_URL
+        sync: false
+      - key: BOT2_PUBLIC_URL
+        sync: false
+      - key: ADMIN_ID
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        generateValue: true
+      - key: TELEGRAM_SECOND_WEBHOOK_SECRET
+        generateValue: true
+      - key: WEBHOOK_AUTO_REGISTER
+        value: "false"
+      - key: TELEGRAM_INIT_DATA_MAX_AGE_SECONDS
+        value: "3600"
+      - key: BANK_WEBHOOK_ENABLED
+        value: "false"
+      - key: VIETQR_BANK_ID
+        sync: false
+      - key: VIETQR_ACCOUNT_NO
+        sync: false
+      - key: VIETQR_ACCOUNT_NAME
+        sync: false
+      - key: GROUP_URL
+        sync: false
+      - key: CHANNEL_URL
+        sync: false
+      - key: SUPPORT_URL
+        sync: false
+      - key: LEGACY_SESSION_SECRET
+        generateValue: true
+      - key: WEBSOCKET_ENABLED
+        value: "false"
+      - key: WEBSOCKET_URL
+        value: wss://hendy-dich-vu-mang.onrender.com/ws
+      - key: WEBSOCKET_ALLOWED_ORIGINS
+        value: https://hendy-dich-vu-mang.onrender.com
+      - key: WEBSOCKET_MAX_CONNECTIONS
+        value: "250"
+      - key: WEBSOCKET_BIND
+        value: 127.0.0.1
+      - key: WEBSOCKET_PORT
+        value: "10001"

@@ -1,10 +1,11 @@
 .env
 .env.*
 !.env.example
-.neon
-node_modules/
 vendor/
+node_modules/
 .DS_Store
 Thumbs.db
-app_store/uploads/screenshots/*
-!app_store/uploads/screenshots/.gitkeep
+/storage/*
+!/storage/.gitkeep
+/app_store/uploads/screenshots/*
+!/app_store/uploads/screenshots/.gitkeep

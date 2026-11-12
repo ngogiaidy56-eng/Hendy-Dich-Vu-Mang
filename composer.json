@@ -1,6 +1,6 @@
 {
-  "name": "hendy-servers/hendy-bot-tele",
-  "description": "Hendy Bot Telegram - PHP 8.3, PostgreSQL and Vietnamese admin dashboard.",
+  "name": "hendy-servers/hendy-dich-vu-mang",
+  "description": "HENDY Telegram Bot, Mini App, customer center and MySQL App Store.",
   "type": "project",
   "require": {
     "php": "^8.3",
@@ -8,6 +8,7 @@
     "ext-json": "*",
     "ext-mbstring": "*",
     "ext-pdo": "*",
+    "ext-pdo_mysql": "*",
     "ext-pdo_pgsql": "*",
     "cboden/ratchet": "^0.4.4"
   },
@@ -17,7 +18,7 @@
     }
   },
   "scripts": {
-    "lint": "find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l",
+    "lint": "find app public bin tests app_store -name '*.php' -print0 | xargs -0 -n1 php -l",
     "test": "php tests/run.php",
     "migrate": "php bin/migrate.php",
     "validate-config": "php bin/validate-config.php",
