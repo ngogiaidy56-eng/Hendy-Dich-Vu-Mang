@@ -201,7 +201,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
 -- Default official website URL shown in the supplied Telegram welcome-screen reference.
 -- Admin can change it from the application settings page; preserve later edits.
 INSERT INTO app_settings (key, value, is_public)
-VALUES ('website_url', 'https://hendy-bot-cybertech-1.onrender.com', TRUE)
+VALUES ('website_url', 'https://hendy-dich-vu-mang.onrender.com', TRUE)
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO app_settings (key, value, is_public)
@@ -210,13 +210,13 @@ ON CONFLICT (key) DO NOTHING;
 
 -- Default welcome-screen links. ON CONFLICT preserves any administrator customization.
 UPDATE app_settings
-SET value = 'https://hendy-bot-cybertech-1.onrender.com', updated_at = NOW()
+SET value = 'https://hendy-dich-vu-mang.onrender.com', updated_at = NOW()
 WHERE key = 'website_url'
   AND value IN (
       'https://lethituanem.com',
       'https://hendy-bot-tele.onrender.com',
       'https://hendy-bot-cybertech.onrender.com',
-      'https://hendy-bot-cybertech-1.onrender.com/'
+      'https://hendy-dich-vu-mang.onrender.com/'
   );
 
 INSERT INTO app_settings (key, value, is_public)

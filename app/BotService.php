@@ -368,7 +368,7 @@ final class BotService
         $settings = $this->settings(['website_url', 'GROUP_URL']);
         $appBaseUrl = rtrim((string) (Env::get('APP_URL') ?: Env::get('RENDER_EXTERNAL_URL', '')), '/');
         $websiteUrl = trim((string) ($settings['website_url'] ?? ''));
-        if (!self::isHttpsUrl($websiteUrl)) $websiteUrl = self::isHttpsUrl($appBaseUrl) ? $appBaseUrl . '/' : 'https://hendy-bot-cybertech-1.onrender.com/';
+        if (!self::isHttpsUrl($websiteUrl)) $websiteUrl = self::isHttpsUrl($appBaseUrl) ? $appBaseUrl . '/' : 'https://hendy-dich-vu-mang.onrender.com/';
         $groupUrl = trim((string) ($settings['GROUP_URL'] ?? Env::get('GROUP_URL', 'https://t.me/Hendy_Support_Group')));
         if (!self::isHttpsUrl($groupUrl)) $groupUrl = 'https://t.me/Hendy_Support_Group';
 
