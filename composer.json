@@ -1,0 +1,30 @@
+{
+  "name": "hendy-servers/hendy-bot-tele",
+  "description": "Hendy Bot Telegram - PHP 8.3, PostgreSQL and Vietnamese admin dashboard.",
+  "type": "project",
+  "require": {
+    "php": "^8.3",
+    "ext-curl": "*",
+    "ext-json": "*",
+    "ext-mbstring": "*",
+    "ext-pdo": "*",
+    "ext-pdo_pgsql": "*",
+    "cboden/ratchet": "^0.4.4"
+  },
+  "autoload": {
+    "psr-4": {
+      "Hendy\\": "app/"
+    }
+  },
+  "scripts": {
+    "lint": "find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l",
+    "test": "php tests/run.php",
+    "migrate": "php bin/migrate.php",
+    "validate-config": "php bin/validate-config.php",
+    "websocket": "php bin/websocket.php",
+    "video-worker": "php bin/video-worker.php"
+  },
+  "config": {
+    "sort-packages": true
+  }
+}
