@@ -1,0 +1,2 @@
+<?php
+require_once __DIR__.'/includes/admin_check.php';require_admin();if($_SERVER['REQUEST_METHOD']!=='POST')exit;csrf_check();$id=(int)($_POST['id']??0);$s=db()->prepare("SELECT * FROM screenshots WHERE id=?");$s->execute([$id]);$im=$s->fetch();if($im){db()->prepare("DELETE FROM screenshots WHERE id=?")->execute([$id]);$f=__DIR__.'/uploads/screenshots/'.$im['filename'];if(is_file($f))unlink($f);header('Location: admin_edit.php?id='.(int)$im['app_id']);exit;}header('Location: admin.php');exit;
