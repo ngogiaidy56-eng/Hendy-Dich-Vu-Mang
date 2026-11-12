@@ -2,10 +2,9 @@ name: Import application source into repository root
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - ".source-import/Hendy-Dich-Vu-Mang-Source.zip"
+      - ".source-import/READY"
   workflow_dispatch:
 
 permissions:
@@ -25,36 +24,25 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Extract sanitized application source
+      - name: Reconstruct and extract sanitized source archive
         shell: bash
         run: |
           set -euo pipefail
+          cat .source-import/part-*.b64 | base64 --decode > /tmp/hendy-source.zip
           python3 - <<'PY'
           from pathlib import Path, PurePosixPath
           from zipfile import ZipFile
           import shutil
 
-          archive = Path(".source-import/Hendy-Dich-Vu-Mang-Source.zip")
+          archive = Path("/tmp/hendy-source.zip")
           expected_root = "hendydichvumang/"
           required = [
-              "Dockerfile",
-              "index.php",
-              "detail.php",
-              "login.php",
-              "register.php",
-              "admin.php",
-              "database.sql",
-              "includes/db.php",
-              "includes/admin_check.php",
-              "includes/header.php",
-              "neon.ts",
-              "functions/api.ts",
-              "assets/neon-realtime.js",
-              "package.json",
+              "Dockerfile", "index.php", "detail.php", "login.php",
+              "register.php", "admin.php", "database.sql",
+              "includes/db.php", "includes/admin_check.php",
+              "includes/header.php", "neon.ts", "functions/api.ts",
+              "assets/neon-realtime.js", "package.json",
           ]
-
-          if not archive.is_file():
-              raise SystemExit(f"Archive not found: {archive}")
 
           with ZipFile(archive) as zf:
               names = set(zf.namelist())
@@ -66,21 +54,17 @@ jobs:
                   name = info.filename
                   if not name.startswith(expected_root) or name == expected_root:
                       continue
-
                   relative = PurePosixPath(name[len(expected_root):])
                   if relative.is_absolute() or ".." in relative.parts:
                       raise SystemExit(f"Unsafe archive path: {name}")
-
-                  # Never import live credentials or machine-local state.
                   if relative.name in {".env", ".env.local", ".neon"}:
                       continue
                   if "node_modules" in relative.parts or "vendor" in relative.parts:
                       continue
-                  if info.is_dir():
-                      (Path(".") / Path(*relative.parts)).mkdir(parents=True, exist_ok=True)
-                      continue
-
                   target = Path(".") / Path(*relative.parts)
+                  if info.is_dir():
+                      target.mkdir(parents=True, exist_ok=True)
+                      continue
                   target.parent.mkdir(parents=True, exist_ok=True)
                   with zf.open(info) as src, target.open("wb") as dst:
                       shutil.copyfileobj(src, dst)
@@ -88,12 +72,10 @@ jobs:
           for item in required:
               if not Path(item).is_file():
                   raise SystemExit(f"Extraction verification failed: {item}")
-
           print("Application source extracted and verified.")
-          print("Required files: " + ", ".join(required))
           PY
 
-      - name: Remove transfer archive and commit extracted source
+      - name: Remove transfer files and commit source
         shell: bash
         run: |
           set -euo pipefail
@@ -101,9 +83,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          if git diff --cached --quiet; then
-            echo "No source changes to commit."
-            exit 0
-          fi
           git commit -m "Import complete Hendy Dịch Vụ Mạng Neon application"
           git push origin HEAD:main
