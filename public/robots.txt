@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /customer
+Disallow: /customer-center
+Disallow: /miniapp
+Disallow: /mini-app
+Disallow: /api/
+Disallow: /webhook/
+
+Sitemap: https://hendy-bot-cybertech-1.onrender.com/sitemap.xml
