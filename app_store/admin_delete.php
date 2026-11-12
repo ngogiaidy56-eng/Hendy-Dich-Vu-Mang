@@ -1,0 +1,2 @@
+<?php
+require_once __DIR__.'/includes/admin_check.php';require_admin();if($_SERVER['REQUEST_METHOD']!=='POST')exit;csrf_check();$id=(int)($_POST['id']??0);$s=db()->prepare("SELECT filename FROM screenshots WHERE app_id=?");$s->execute([$id]);foreach($s->fetchAll() as $r){$f=__DIR__.'/uploads/screenshots/'.$r['filename'];if(is_file($f))unlink($f);}db()->prepare("DELETE FROM apps WHERE id=?")->execute([$id]);flash('Đã xóa ứng dụng.');header('Location: admin.php');exit;
